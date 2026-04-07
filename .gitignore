@@ -1,5 +1,12 @@
+# Python bytecode and cache directories
 __pycache__/
 *.py[cod]
+
+# Local virtual environment
 venv/
+
+# Local environment variables
 .env
+
+# PyCharm / IntelliJ project files
 .idea/
