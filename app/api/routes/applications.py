@@ -1,56 +1,137 @@
+# app/api/routes/applications.py
+
+"""
+Application Routes (API Layer)
+
+This module defines all HTTP endpoints related to job applications.
+
+Responsibilities:
+- Handle HTTP requests and responses
+- Validate inputs (via schemas)
+- Call service layer for business logic
+- Return appropriate HTTP responses
+
+NOTE:
+All core logic is delegated to the service layer (job_service).
+"""
+
 from fastapi import APIRouter, HTTPException
 from typing import List
-from app.schemas.application import JobApplication, JobApplicationCreate, JobApplicationUpdate
 
+from app.schemas.application import (
+    JobApplication,
+    JobApplicationCreate,
+    JobApplicationUpdate
+)
+
+from app.services import job_service
+
+# Create router instance for application-related endpoints
 router = APIRouter()
 
-# In-memory list acting as a temporary database.
-# This will later be replaced by Postgres.
-_db = []
 
-# Simple ID counter for new records.
-_id_counter = 1
-
-
-# Create a new job application record
+# ------------------------------------------------------------------
+# Create a New Job Application
+# ------------------------------------------------------------------
 @router.post("/", response_model=JobApplication)
-def create_application(app: JobApplicationCreate):
-    global _id_counter
-    record = JobApplication(id=_id_counter, **app.dict())
-    _db.append(record)
-    _id_counter += 1
-    return record
+async def create_application(data: JobApplicationCreate):
+    """
+    Creates a new job application.
+
+    Args:
+        data (JobApplicationCreate): Incoming request payload
+
+    Returns:
+        JobApplication: Newly created application
+    """
+    return job_service.create_application(data)
 
 
+# ------------------------------------------------------------------
+# Get All Job Applications
+# ------------------------------------------------------------------
 @router.get("/", response_model=List[JobApplication])
-def list_applications():
-    return _db
+async def list_applications():
+    """
+    Retrieves all job applications.
+
+    Returns:
+        List[JobApplication]: List of all stored applications
+    """
+    return job_service.list_applications()
 
 
+# ------------------------------------------------------------------
+# Get a Single Job Application by ID
+# ------------------------------------------------------------------
 @router.get("/{app_id}", response_model=JobApplication)
-def get_application(app_id: int):
-    for app in _db:
-        if app.id == app_id:
-            return app
-    raise HTTPException(status_code=404, detail="Application not found")
+async def get_application(app_id: int):
+    """
+    Retrieves a specific job application by ID.
+
+    Args:
+        app_id (int): Unique identifier of the application
+
+    Returns:
+        JobApplication: Matching application
+
+    Raises:
+        HTTPException: 404 if application not found
+    """
+    app = job_service.get_application(app_id)
+
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    return app
 
 
-@router.delete("/{app_id}")
-def delete_application(app_id: int):
-    global _db
-    _db = [a for a in _db if a.id != app_id]
-    return {"deleted": app_id}
-
-
+# ------------------------------------------------------------------
+# Update an Existing Job Application
+# ------------------------------------------------------------------
 @router.patch("/{app_id}", response_model=JobApplication)
 async def update_application(app_id: int, updates: JobApplicationUpdate):
-    for app in _db:
-        if app.id == app_id:
-            data = updates.dict(exclude_unset=True)
+    """
+    Updates fields of an existing job application.
 
-            for key, value in data.items():
-                setattr(app, key, value)
+    Args:
+        app_id (int): Application ID
+        updates (JobApplicationUpdate): Fields to update
 
-            return app
+    Returns:
+        JobApplication: Updated application
 
-    raise HTTPException(status_code=404, detail="Application not found")
+    Raises:
+        HTTPException: 404 if application not found
+    """
+    app = job_service.update_application(app_id, updates)
+
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    return app
+
+
+# ------------------------------------------------------------------
+# Delete a Job Application
+# ------------------------------------------------------------------
+@router.delete("/{app_id}")
+async def delete_application(app_id: int):
+    """
+    Deletes a job application by ID.
+
+    Args:
+        app_id (int): Application ID
+
+    Returns:
+        dict: Confirmation message
+
+    Raises:
+        HTTPException: 404 if application not found
+    """
+    success = job_service.delete_application(app_id)
+
+    if not success:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    return {"message": "Deleted successfully"}
